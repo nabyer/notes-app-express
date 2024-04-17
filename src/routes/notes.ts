@@ -1,7 +1,7 @@
 import { Request, Response, Router } from 'express'
 import * as fs from 'node:fs'
 // const fs = require('fs')
-import { getNotes } from '../services/data'
+import { getNotes, getNoteById } from '../services/data'
 import { Note } from '../types/notes'
 
 
@@ -96,8 +96,73 @@ notesRouter.get('/:id', (req: Request, res: Response) => {
 
 })
 
-// Update - PUT/PATCH -> TODO: Beispiel
-notesRouter.put('/:id', (req: Request, res: Response) => { })
+// Update - PUT -> TODO: Beispiel
+notesRouter.put('/:id', (req: Request, res: Response) => { 
+  // 1. Daten aus der Anfrage auslesen
+  // Wir erwarten, dass wir Informationen zum title, content, user
+
+  // const { title, content, user } = req.body
+
+  const title = req.body.title
+  const content = req.body.content
+  const user = req.body.user
+  const id = parseInt(req.params.id)
+
+  const oldNote = getNoteById(id)
+
+  if (oldNote === undefined) {
+    res.status(404).send(`Die Notiz mit ID ${id} wurde nicht gefunden.`)
+  }
+
+  // 2.1 alte Daten abfragen
+  const oldNotes = getNotes()
+  const filteredNotes = oldNotes.filter(note => note.id !== id)
+
+  // 2.2 neue Notiz erstellen
+  const newNote: Note = {
+    title: title,
+    content: content,
+    user: user,
+    id: id
+  }
+
+  filteredNotes.push(newNote)
+
+  // 2.3 neue Notiz in Datei hinzufügen
+
+  const newNotes = { notes: filteredNotes }
+  fs.writeFileSync('data/notes.json', JSON.stringify(newNotes))
+
+  // 3. Rückmeldung geben, ob alles funktioniert hat
+
+  res.status(204).send(`Die Notiz mit ID ${id} wurde aktualisiert.`)
+
+
+})
+
+// Update - PATCH -> TODO: Beispiel
+notesRouter.patch('/:id', (req: Request, res: Response) => { })
 
 // Delete - DELETE
-notesRouter.delete('/:id', (req: Request, res: Response) => { })
+notesRouter.delete('/:id', (req: Request, res: Response) => { 
+
+  const id = parseInt(req.params.id)
+
+  const oldNote = getNoteById(id)
+
+  if (oldNote === undefined) {
+    res.status(404).send(`Die Notiz mit ID ${id} wurde nicht gefunden.`)
+  }
+
+  // 2.1 alte Daten abfragen
+  const oldNotes = getNotes()
+  const filteredNotes = oldNotes.filter(note => note.id !== id)
+
+  const newNotes = { notes: filteredNotes }
+  fs.writeFileSync('data/notes.json', JSON.stringify(newNotes))
+
+  // 3. Rückmeldung geben, ob alles funktioniert hat
+
+  res.status(204).send(`Die Notiz mit ID ${id} wurde geloescht.`)
+
+})
