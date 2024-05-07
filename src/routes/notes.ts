@@ -5,7 +5,7 @@ import { hasAuthentication } from '../middleware/auth'
 import { RequestBody } from '../types/requestBody'
 
 
-export const notesRouter = Router()
+export const notesRouter = Router();
 
 /**
  * @route POST /notes - Endpoint to add a new note.
@@ -17,12 +17,16 @@ export const notesRouter = Router()
  */
 notesRouter.post('/', hasAuthentication, (req: Request, res: Response) => {
 
-  const {title, content, user, categories}: RequestBody = req.body
+  const authorizedUser = req.headers.authorization!;
+  const {title, content, user, categories}: RequestBody = req.body;
 
-  addNote(title, content, user, categories)
-
-  res.status(204).send()
-})
+  if (authorizedUser !== user) {
+    res.status(403).send('Forbidden');
+  } else { 
+    const newNote = addNote(title, content, user, categories);
+    res.status(201).send('Die Notiz wurde erfolgreich erstellt.\n' + JSON.stringify(newNote));
+   }
+});
 
 /**
  * @route GET /notes - Endpoint to retrieve notes belonging to the authenticated user.
@@ -33,12 +37,16 @@ notesRouter.post('/', hasAuthentication, (req: Request, res: Response) => {
  * @returns {void} - Responds with a HTTP 200 OK status and an array of notes belonging to the user.
  */
 notesRouter.get('/', hasAuthentication, (req: Request, res: Response) => {
-  const user = req.headers.authorization!
+ 
+  const authorizedUser = req.headers.authorization;
 
-  const notes: Note[] = getNotes().filter(note => note.user === user)
-
-  res.status(200).send(notes)
-})
+  if (!authorizedUser) {
+      res.status(403).send('Forbidden');
+  }  else {
+      const notes: Note[] = getNotes().filter(note => note.user === authorizedUser);
+      res.status(200).send(notes);
+  }
+  });
 
 /**
  * @route GET /notes/:id - Endpoint to retrieve a specific note by ID associated with the authenticated user.
@@ -51,15 +59,21 @@ notesRouter.get('/', hasAuthentication, (req: Request, res: Response) => {
  */
 notesRouter.get('/:id', hasAuthentication, (req: Request, res: Response) => {
 
-  const id: number = parseInt(req.params.id)
-  const note: Note | undefined = getNoteById(id)
+  const authorizedUser = req.headers.authorization;
+  const id: number = parseInt(req.params.id);
+  const note: Note | undefined = getNoteById(id);
 
-  if (note === undefined) {
-    res.status(404).send(`Die Notiz mit ID ${id} wurde nicht gefunden.`)
-  } else {
-    res.status(200).send(note)
-  }
-})
+
+  if (!authorizedUser) {
+    res.status(403).send('Forbidden');
+      } else {
+    if (note === undefined) {
+    res.status(404).send(`Die Notiz mit ID ${id} wurde nicht gefunden.`);
+      } else {
+      res.status(200).send(note);
+      }
+    }
+  });
 
 /**
  * @route PUT /notes/:id - Endpoint to update a note by ID.
@@ -71,22 +85,25 @@ notesRouter.get('/:id', hasAuthentication, (req: Request, res: Response) => {
  * @returns {void} Responds with an HTTP 204 No Content status upon successful note creation. 
  * If the note does not exist, returns HTTP 404 Not Found.
  */
-notesRouter.put('/:id', hasAuthentication, (req: Request, res: Response) => { 
+notesRouter.put('/:id', hasAuthentication, (req: Request, res: Response) => {
 
-  const {title, content, user, categories}: RequestBody = req.body
+  const {title, content, categories}: RequestBody = req.body;
+  const id: number = parseInt(req.params.id);
+  const authorizedUser = req.headers.authorization;
 
-  const id: number = parseInt(req.params.id)
-  const oldNote: Note | undefined = getNoteById(id)
-
-  if (oldNote === undefined) {
-    res.status(404).send(`Die Notiz mit ID ${id} wurde nicht gefunden.`)
-    return
+  if (!authorizedUser) {
+    res.status(403).send('Forbidden');
+    return;
   }
 
-  updateNote(id, title, content, user, categories)
-
-  res.status(204).send()
-})
+  const oldNote: Note | undefined = getNoteById(id);
+  if (oldNote === undefined) {
+    res.status(404).send(`Die Notiz mit ID ${id} wurde nicht gefunden.`);
+  } else {
+  updateNote(id, title, content, authorizedUser, categories);
+  res.status(204).send();
+  }
+});
 
 /**
  * @route PATCH /notes/:id - Endpoint to partially update a note by ID.
@@ -99,23 +116,28 @@ notesRouter.put('/:id', hasAuthentication, (req: Request, res: Response) => {
  */
 notesRouter.patch('/:id', hasAuthentication, (req: Request, res: Response) => {
 
-  const id: number = parseInt(req.params.id)
-  const oldNote: Note | undefined = getNoteById(id)
+  const id: number = parseInt(req.params.id);
+  const oldNote: Note | undefined = getNoteById(id);
+  const authorizedUser = req.headers.authorization;
 
+  if (!authorizedUser) {
+    res.status(403).send('Forbidden');
+  } else {
   if (oldNote === undefined) {
-    res.status(404).send(`Die Notiz mit ID ${id} wurde nicht gefunden.`)
-    return
+    res.status(404).send(`Die Notiz mit ID ${id} wurde nicht gefunden.`);
+    return;
   }
 
-  const title: string = req.body.title ?? oldNote.title
-  const content: string = req.body.content ?? oldNote.content
-  const user: string = req.body.user ?? oldNote.user
-  const categories: string[] = req.body.categories ?? oldNote.categories
+  const title: string = req.body.title ?? oldNote.title;
+  const content: string = req.body.content ?? oldNote.content;
+  const user: string = req.body.user ?? oldNote.user;
+  const categories: string[] = req.body.categories ?? oldNote.categories;
 
-  updateNote(id, title, content, user, categories)
+  updateNote(id, title, content, user, categories);
 
-  res.status(204).send()
- })
+  res.status(204).send();
+  }
+});
 
 /**
  * @route DELETE /notes/:id
@@ -128,14 +150,20 @@ notesRouter.patch('/:id', hasAuthentication, (req: Request, res: Response) => {
 notesRouter.delete('/:id', hasAuthentication, (req: Request, res: Response) => { 
 
   const id: number = parseInt(req.params.id)
-  const oldNote: Note | undefined = getNoteById(id)
+  const authorizedUser = req.headers.authorization
 
+  if (!authorizedUser) {
+    res.status(403).send('Forbidden');
+    return;
+  };
+
+  const oldNote: Note | undefined = getNoteById(id);
   if (oldNote === undefined) {
-    res.status(404).send(`Die Notiz mit ID ${id} wurde nicht gefunden.`)
-    return
-  }
+    res.status(404).send(`Die Notiz mit ID ${id} wurde nicht gefunden.`);
+    return;
+  };
 
-  deleteNoteById(id)
+  deleteNoteById(id);
 
-  res.status(204).send()
-})
+  res.status(204).send();
+});
